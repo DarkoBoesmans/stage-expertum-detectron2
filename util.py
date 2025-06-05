@@ -113,8 +113,30 @@ def get_dicts(img_dir, ann_dir):
 
         record = {}
 
-        filename = os.path.join(img_dir, file[:-4] + ".jpg")
-        height, width = cv2.imread(filename).shape[:2]
+        # Verwijder de :Zone.Identifier deel uit de bestandsnaam als dat aanwezig is
+        base_name = file[:-4]  # Verwijder .txt extensie
+        if ":Zone.Identifier" in base_name:
+            base_name = base_name.replace(":Zone.Identifier", "")
+        
+        # Verschillende extensies proberen als de afbeelding niet gevonden wordt
+        img_extensions = [".jpg", ".jpeg", ".png"]
+        
+        # Check eerst of het bestand bestaat
+        image = None
+        for ext in img_extensions:
+            potential_filename = os.path.join(img_dir, base_name + ext)
+            if os.path.exists(potential_filename):
+                filename = potential_filename
+                image = cv2.imread(filename)
+                if image is not None:
+                    break
+        
+        # Als geen afbeelding is gevonden, sla deze annotatie over
+        if image is None:
+            print(f"Waarschuwing: Kon afbeelding voor {file} niet vinden of lezen. Deze wordt overgeslagen.")
+            continue
+            
+        height, width = image.shape[:2]
 
         record["file_name"] = filename
         record["image_id"] = idx
