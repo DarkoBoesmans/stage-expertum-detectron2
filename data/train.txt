@@ -1,0 +1,15 @@
+data/obj_train_data/0a487234-7a0d-45b8-be19-f6ba78f9154a.jpg
+data/obj_train_data/12d81610-a108-4f0f-9a95-7dbbeb70f849.jpg
+data/obj_train_data/1c11c1a5-341b-4577-891b-be621c65a249.jpg
+data/obj_train_data/4bdf4a41-bd88-45ad-a309-e2898d5b45b6.jpg
+data/obj_train_data/694-1145632345.jpg
+data/obj_train_data/763-785182177.jpg
+data/obj_train_data/874e13c9-3766-4a3c-a9d4-9a1972dc289f.jpg
+data/obj_train_data/IMAG0980-2306058459.jpg
+data/obj_train_data/a466009e-57d4-469f-a74f-8986aca75c98.jpg
+data/obj_train_data/bouw-en-sloopafval-container-afvalcontainer-bestellen-scaled-2055685975.jpg
+data/obj_train_data/c7e8d631-5a2b-4f8e-9d27-e3b1c2f9a56d.jpg
+data/obj_train_data/cranie-3839891386.png
+data/obj_train_data/dabbe6a5-e278-495e-9eea-bef9ba4cb7ac.jpg
+data/obj_train_data/ffdda29d-3663-44f5-8281-2b9048f25a02.jpg
+data/obj_train_data/slaak-2995139074.jpg
