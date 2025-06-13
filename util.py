@@ -39,46 +39,36 @@ def get_cfg(
     """
     cfg = _get_cfg()
 
-    # Merge the model's default configuration file with the default Detectron2 configuration file.
     cfg.merge_from_file(model_zoo.get_config_file(model))
 
-    # Set the training and validation datasets and exclude the test dataset.
     cfg.DATASETS.TRAIN = ("train",)
-    cfg.DATASETS.VAL = ("val",)
-    cfg.DATASETS.TEST = ()
+    cfg.DATASETS.TEST = ("val",)
+
+    cfg.DATALOADER.NUM_WORKERS = 4
+
+    # Use a model pre-trained on COCO.
+    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(model)
 
     # Set the device to use for training.
     if device in ["cpu"]:
         cfg.MODEL.DEVICE = "cpu"
 
-    # Set the number of data loader workers.
-    cfg.DATALOADER.NUM_WORKERS = 2
-
-    # Set the model weights to the ones pre-trained on the COCO dataset.
-    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(model)
-
-    # Set the batch size used by the solver.
+    # Use a smaller batch size if you encounter out-of-memory errors.
     cfg.SOLVER.IMS_PER_BATCH = batch_size
 
-    # Set the checkpoint period.
-    cfg.SOLVER.CHECKPOINT_PERIOD = checkpoint_period
-
-    # Set the base learning rate.
+    # Set the learning rate for the optimizer.
     cfg.SOLVER.BASE_LR = learning_rate
 
     # Set the maximum number of training iterations.
     cfg.SOLVER.MAX_ITER = iterations
 
-    # Set the learning rate scheduler steps to an empty list, which means the learning rate will not be decayed.
-    cfg.SOLVER.STEPS = []
+    # Set the number of iterations between consecutive checkpoints.
+    cfg.SOLVER.CHECKPOINT_PERIOD = checkpoint_period
 
-    # Set the batch size used by the ROI heads during training.
-    cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 128
-
-    # Set the number of classes.
+    # Set the number of classes in the dataset.
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = nmr_classes
+    cfg.MODEL.RETINANET.NUM_CLASSES = nmr_classes
 
-    # Set the output directory.
     cfg.OUTPUT_DIR = output_dir
 
     return cfg
@@ -86,17 +76,16 @@ def get_cfg(
 
 def get_dicts(img_dir, ann_dir):
     """
-    Read the annotations for the dataset in YOLO format and create a list of dictionaries containing information for each
-    image.
+    Convert the YOLO-format annotations in ann_dir to the format expected by Detectron2.
 
     Args:
-        img_dir (str): Directory containing the images.
-        ann_dir (str): Directory containing the annotations.
+        img_dir (str): The directory containing the image files.
+        ann_dir (str): The directory containing the annotation files in YOLO format.
 
     Returns:
-        list[dict]: A list of dictionaries containing information for each image. Each dictionary has the following keys:
+        list: A list of dictionaries, one for each image, where each dictionary contains the following keys:
             - file_name: The path to the image file.
-            - image_id: The unique identifier for the image.
+            - image_id: A unique ID for the image.
             - height: The height of the image in pixels.
             - width: The width of the image in pixels.
             - annotations: A list of dictionaries, one for each object in the image, containing the following keys:
@@ -108,13 +97,39 @@ def get_dicts(img_dir, ann_dir):
                 - category_id: The integer ID of the object's class.
     """
     dataset_dicts = []
-    for idx, file in enumerate(os.listdir(ann_dir)):
-        # annotations should be provided in yolo format
+    annotation_files = os.listdir(ann_dir)
+    annotations_count = 0
+    valid_images = 0
 
+    print(f"Loading annotations from {ann_dir} ({len(annotation_files)} files)")
+
+    for idx, file in enumerate(annotation_files):
+        # annotations should be provided in yolo format
         record = {}
 
-        filename = os.path.join(img_dir, file[:-4] + ".jpg")
-        height, width = cv2.imread(filename).shape[:2]
+        # Check for common image extensions
+        img_extensions = [".jpg", ".jpeg", ".png", ".webp"]
+        img_found = False
+        filename = None
+
+        for ext in img_extensions:
+            img_path = os.path.join(img_dir, file[:-4] + ext)
+            if os.path.exists(img_path):
+                filename = img_path
+                img_found = True
+                break
+
+        if not img_found:
+            print(f"Warning: No image found for annotation {file}")
+            continue
+
+        img = cv2.imread(filename)
+        if img is None:
+            print(f"Warning: Could not read image {filename}")
+            continue
+
+        height, width = img.shape[:2]
+        valid_images += 1
 
         record["file_name"] = filename
         record["image_id"] = idx
@@ -123,32 +138,50 @@ def get_dicts(img_dir, ann_dir):
 
         objs = []
         with open(os.path.join(ann_dir, file)) as r:
-            lines = [l[:-1] for l in r.readlines()]
+            lines = [l.strip() for l in r.readlines()]
 
         for _, line in enumerate(lines):
-            if len(line) > 2:
-                label, cx, cy, w_, h_ = line.split(" ")
+            if len(line) > 2 and not line.startswith("#"):
+                try:
+                    parts = line.split(" ")
+                    if len(parts) != 5:
+                        print(f"Warning: Invalid annotation format in {file}: {line}")
+                        continue
 
-                obj = {
-                    "bbox": [
-                        int((float(cx) - (float(w_) / 2)) * width),
-                        int((float(cy) - (float(h_) / 2)) * height),
-                        int(float(w_) * width),
-                        int(float(h_) * height),
-                    ],
-                    "bbox_mode": BoxMode.XYWH_ABS,
-                    "category_id": int(label),
-                }
+                    label, cx, cy, w_, h_ = parts
 
-                objs.append(obj)
+                    obj = {
+                        "bbox": [
+                            int((float(cx) - (float(w_) / 2)) * width),
+                            int((float(cy) - (float(h_) / 2)) * height),
+                            int(float(w_) * width),
+                            int(float(h_) * height),
+                        ],
+                        "bbox_mode": BoxMode.XYWH_ABS,
+                        "category_id": int(label),
+                    }
+
+                    objs.append(obj)
+                    annotations_count += 1
+
+                except ValueError as e:
+                    print(f"Warning: Could not parse annotation in {file}: {line}")
+                    print(f"Error: {str(e)}")
+                    continue
+
         record["annotations"] = objs
         dataset_dicts.append(record)
+
+    print(
+        f"Successfully loaded {valid_images} images with {annotations_count} annotations"
+    )
     return dataset_dicts
 
 
 def register_datasets(root_dir, class_list_file):
     """
     Registers the train and validation datasets and returns the number of classes.
+    If the datasets are already registered, it will not register them again.
 
     Args:
         root_dir (str): Path to the root directory of the dataset.
@@ -159,10 +192,18 @@ def register_datasets(root_dir, class_list_file):
     """
     # Read the list of class names from the class list file.
     with open(class_list_file, "r") as reader:
-        classes_ = [l[:-1] for l in reader.readlines()]
+        classes_ = [l.strip() for l in reader.readlines()]
 
-    # Register the train and validation datasets.
+    # Register the train and validation datasets, deregistering them first if already registered
     for d in ["train", "val"]:
+        # De-register if already registered
+        if d in DatasetCatalog:
+            DatasetCatalog.remove(d)
+            print(
+                f"Dataset '{d}' was already registered. Re-registering with updated data."
+            )
+
+        # Register the dataset
         DatasetCatalog.register(
             d,
             lambda d=d: get_dicts(
@@ -204,38 +245,38 @@ def train(
         None
     """
 
+    # Count training and validation images
+    train_img_count = (
+        len(os.listdir(os.path.join(data_dir, "train", "imgs")))
+        if os.path.exists(os.path.join(data_dir, "train", "imgs"))
+        else 0
+    )
+    val_img_count = (
+        len(os.listdir(os.path.join(data_dir, "val", "imgs")))
+        if os.path.exists(os.path.join(data_dir, "val", "imgs"))
+        else 0
+    )
+
+    print(
+        f"Dataset contains {train_img_count} training images and {val_img_count} validation images"
+    )
+
     # Register the dataset and get the number of classes
     nmr_classes = register_datasets(data_dir, class_list_file)
 
-    # Get the configuration for the model
+    # Create the configuration object for the model
     cfg = get_cfg(
-        output_dir,
-        learning_rate,
-        batch_size,
-        iterations,
-        checkpoint_period,
-        model,
-        device,
-        nmr_classes,
+        output_dir=output_dir,
+        learning_rate=learning_rate,
+        batch_size=batch_size,
+        iterations=iterations,
+        checkpoint_period=checkpoint_period,
+        model=model,
+        device=device,
+        nmr_classes=nmr_classes,
     )
 
-    # Create the output directory
-    os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
-
-    # Create the trainer object
-    trainer = DefaultTrainer(cfg)
-
-    # Create a custom validation loss object
-    val_loss = ValidationLoss(cfg)
-
-    # Register the custom validation loss object as a hook to the trainer
-    trainer.register_hooks([val_loss])
-
-    # Swap the positions of the evaluation and checkpointing hooks so that the validation loss is logged correctly
-    trainer._hooks = trainer._hooks[:-2] + trainer._hooks[-2:][::-1]
-
-    # Resume training from a checkpoint or load the initial model weights
+    # Create a DefaultTrainer object and train the model
+    trainer = ValidationLoss(cfg)
     trainer.resume_or_load(resume=False)
-
-    # Train the model
     trainer.train()
