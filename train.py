@@ -46,7 +46,7 @@ def train_minibatches(
     batch_size=1,  # Number of samples per batch
     iterations=50,  # Total number of training iterations
     checkpoint_period=25,  # Save model every this many iterations
-    model="COCO-Detection/retinanet_R_50_FPN_1x.yaml",  # Model configuration
+    model="COCO-Detection/faster_rcnn_R_50_FPN_1x.yaml",  # Model configuration
     mini_batch_size=5,  # Number of iterations to run before freeing memory
 ):
     """
