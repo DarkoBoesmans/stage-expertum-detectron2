@@ -1,52 +1,71 @@
-from detectron2.engine import HookBase
+from detectron2.engine import DefaultTrainer, HookBase
 from detectron2.data import build_detection_train_loader
 import detectron2.utils.comm as comm
 import torch
+import logging
+import time
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 
-class ValidationLoss(HookBase):
+class LossEvalHook(HookBase):
+    """A hook to evaluate loss on the validation dataset during training."""
+    
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg.clone()
+        self.cfg.DATASETS.TRAIN = cfg.DATASETS.TEST  # Use TEST dataset for validation
+        self._period = 20  # Run validation every 20 iterations
+        self._logger = logging.getLogger(__name__)
+    
+    def _do_eval(self):
+        data_loader = build_detection_train_loader(self.cfg)
+        total_losses = []
+        
+        for idx, inputs in enumerate(data_loader):
+            if idx >= 10:  # Limit to 10 batches for efficiency
+                break
+            with torch.no_grad():
+                loss_dict = self.trainer.model(inputs)
+                losses = sum(loss_dict.values())
+                total_losses.append(losses)
+        
+        if len(total_losses) > 0:
+            mean_loss = torch.stack(total_losses).mean().item()
+            self.trainer.storage.put_scalar("validation_loss", mean_loss)
+            # Direct logger call instead of log_every_n_seconds
+            self._logger.info(f"Validation loss at iteration {self.trainer.iter}: {mean_loss:.4f}")
+        else:
+            self._logger.warning("No validation data was successfully processed")
+    
+    def after_step(self):
+        next_iter = self.trainer.iter + 1
+        if next_iter % self._period == 0:
+            self._do_eval()
+
+
+class ValidationLoss(DefaultTrainer):
     """
-    A hook that computes validation loss during training.
-
-    Attributes:
-        cfg (CfgNode): The detectron2 config node.
-        _loader (iterator): An iterator over the validation dataset.
+    A trainer class with validation loss computation capabilities.
+    Extends DefaultTrainer by adding validation loss evaluation during training.
     """
-
+    
     def __init__(self, cfg):
         """
         Args:
             cfg (CfgNode): The detectron2 config node.
         """
-        super().__init__()
-        self.cfg = cfg.clone()
-        # Switch to the validation dataset
-        self.cfg.DATASETS.TRAIN = cfg.DATASETS.VAL
-        # Build the validation data loader iterator
-        self._loader = iter(build_detection_train_loader(self.cfg))
-
-    def after_step(self):
+        super().__init__(cfg)
+        print("Initialized ValidationLoss trainer with validation loss computation")
+    
+    def build_hooks(self):
         """
-        Computes the validation loss after each training step.
+        Build hooks for training, adding our validation loss hook.
+        Returns:
+            list[HookBase]: List of training hooks.
         """
-        # Get the next batch of data from the validation data loader
-        data = next(self._loader)
-        with torch.no_grad():
-            # Compute the validation loss on the current batch of data
-            loss_dict = self.trainer.model(data)
-
-            # Check for invalid losses
-            losses = sum(loss_dict.values())
-            assert torch.isfinite(losses).all(), loss_dict
-
-            # Reduce the loss across all workers
-            loss_dict_reduced = {
-                "val_" + k: v.item() for k, v in comm.reduce_dict(loss_dict).items()
-            }
-            losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-
-            # Save the validation loss in the trainer storage
-            if comm.is_main_process():
-                self.trainer.storage.put_scalars(
-                    total_val_loss=losses_reduced, **loss_dict_reduced
-                )
+        hooks = super().build_hooks()
+        # Add the validation loss hook before the end-of-iteration hook
+        hooks.insert(-1, LossEvalHook(self.cfg))
+        return hooks
