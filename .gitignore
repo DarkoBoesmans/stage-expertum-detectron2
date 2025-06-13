@@ -1,38 +1,59 @@
-# Python virtual environment
-venv/
-env/
-ENV/
-detectron2-env/
-
-# Python cache files
+# Python bestanden
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-
-# Distribution / packaging
-dist/
+env/
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
+.installed.cfg
+*.egg
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Model bestanden (vaak groot)
+*.pth
+*.pt
+*.pkl
+*.h5
+*.hdf5
+model_final.pth
+output/model_*
 
-# Training output
-output/
-
-# Local development settings
+# IDE bestanden
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Lokale configuratie bestanden
+*.env
+.env
+
+# Virtual environment
+venv/
+env/
+detectron2-env/
+
+# Log bestanden
+*.log
+*.out
+*.err
+events.out.tfevents.*
+output/
+
+# Databestanden 
+data/
+
+# Cache bestanden
+.cache/

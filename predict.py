@@ -200,10 +200,8 @@ def process_images(image_dir, output_dir, predictor_data):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Detectron2 voorspellingsscript")
 
-    # Bepaal standaard modelpad - gebruik model_release/weights als eerste optie
-    default_model_path = "./model_release/weights/model_final.pth"
-    if not os.path.exists(default_model_path):
-        default_model_path = "./output/model_final.pth"  # Als fallback
+    # Gebruik het standaard modelpad in output directory
+    default_model_path = "./output/model_final.pth"
 
     parser.add_argument(
         "--model-path", default=default_model_path, help="Pad naar het getrainde model"
@@ -228,9 +226,7 @@ if __name__ == "__main__":
     # Check of het model bestaat
     if not os.path.exists(args.model_path):
         print(f"FOUT: Model niet gevonden op {args.model_path}")
-        print("Opties:")
-        print("1. Download het voorgetrainde model van de GitHub release")
-        print("2. Train zelf een model met train.py")
+        print("Zorg ervoor dat je eerst een model traint met train.py")
         exit(1)
 
     # Check of het invoerpad bestaat

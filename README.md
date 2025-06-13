@@ -1,37 +1,38 @@
-# Afvalcontainer Detectie Model met Detectron2
+# Detectron2 Training Tool
 
-Dit project biedt een compleet systeem voor het detecteren van afvalcontainers in afbeeldingen, gebaseerd op Detectron2. Het bevat zowel trainingstools als een voorgetraind model dat direct gebruikt kan worden.
+Dit project biedt een eenvoudige interface om Detectron2 modellen te trainen met data in YOLO-formaat. Het stelt gebruikers in staat om object detectie modellen te trainen met minimale configuratie.
 
-## Voor Gebruikers: Direct voorspellingen maken
+## Overzicht
 
-### Installatie
+Deze tool converteert YOLO-formaat annotaties naar een formaat dat compatibel is met Detectron2 en verzorgt het trainen van object detectie modellen. Het ondersteunt verschillende Detectron2 architecturen en biedt flexibiliteit in training parameters.
+
+## Installatie
 
 1. Clone deze repository:
    ```bash
-   git clone https://github.com/jouw-username/afvalcontainer-detectie.git
-   cd afvalcontainer-detectie
+   git clone https://github.com/jouw-username/detectron2-training-tool.git
+   cd detectron2-training-tool
    ```
 
-2. Installeer Git LFS om het voorgetrainde model te downloaden:
-   ```bash
-   # Voor Ubuntu/Debian
-   sudo apt-get install git-lfs
-   # Voor macOS
-   brew install git-lfs
-   
-   # In de repository map
-   git lfs install
-   git lfs pull
-   ```
-
-3. Installeer de vereiste Python packages:
+2. Installeer de vereiste Python packages:
    ```bash
    pip install -r requirements.txt
    ```
 
-### Gebruik
+## Gebruik
 
-Om voorspellingen te maken met het voorgetrainde model:
+### Training
+
+Om een model te trainen:
+
+```bash
+python train.py
+```
+
+### Voorspellingen maken
+
+Om voorspellingen te maken met je getrainde model:
+
 ```bash
 python predict.py
 ```
@@ -41,11 +42,8 @@ Standaard worden afbeeldingen uit de `./img` map verwerkt, en resultaten opgesla
 python predict.py --help
 ```
 
-## Voor Ontwikkelaars: Je eigen model trainen
+## Belangrijke componenten
 
-Deze tool converteert YOLO-formaat annotaties naar een formaat dat compatibel is met Detectron2 en verzorgt het trainen van object detectie modellen. 
-
-Belangrijke componenten:
 - `train.py`: Training script
 - `check_model.py`: Script om modellen te trainen met geheugenmonitoring en beperkt geheugen
 - `predict.py`: Script om voorspellingen te maken met getrainde modellen
